@@ -328,7 +328,7 @@ def csv_to_fasta_main(args):  # pylint: disable=redefined-outer-name
 
   print(f"load {args.target_uri} ...")
   target_uri = parse_db_uri(args.target_uri)
-  mapping_idx = read_mapping_idx(args.target_uri)
+  mapping_idx = read_mapping_idx(target_uri)
   fasta_idx = read_fasta(target_uri, mapping_idx)
 
   def cell_check(c):
@@ -384,6 +384,54 @@ def csv_to_fasta_add_argument(parser):  # pylint: disable=redefined-outer-name
                       type=int,
                       default=0,
                       help="start index for each protein.")
+  parser.add_argument("csv_file", type=str, default=None, help="csv file")
+  return parser
+
+
+def mhc_preprocess_main(args):  # pylint: disable=redefined-outer-name
+  mhc_seq_dict = {}
+
+  print(f"load {args.mhc_seq_file} ...")
+  with open(args.mhc_seq_file, "r") as f:
+    reader = csv.DictReader(f)
+    for row in reader:
+      name = re.split(r"[*:]", row["name"])
+
+      for idx in (3, 2):
+        k = "".join(name[:idx])
+        if k not in mhc_seq_dict:
+          mhc_seq_dict[k] = row["sqe"]
+
+  mhc_rows = []
+  print(f"process {args.csv_file} ...")
+  with open(args.csv_file, "r") as f:
+    reader = csv.DictReader(f)
+
+    for row in reader:
+      allele = row["Allele"]
+      if allele in mhc_seq_dict:
+        mhc_rows.append({"Antigen": row["Peptide"], "MHC_str": mhc_seq_dict[allele]})
+      elif args.verbose:
+        print(f"{allele} not found")
+
+  print("write args.output ...")
+  with open(args.output, "w") as f:
+    writer = csv.DictWriter(f, ("Antigen", "a_seq", "b_seq", "MHC_str"))
+    writer.writeheader()
+    for row in mhc_rows:
+      writer.writerow(row)
+
+
+def mhc_preprocess_add_argument(parser):  # pylint: disable=redefined-outer-name
+  parser.add_argument("-o",
+                      "--output",
+                      type=str,
+                      default=".",
+                      help="output dir.")
+  parser.add_argument("--mhc_seq_file",
+                      type=str,
+                      default=None,
+                      help="mhc sequence file.")
   parser.add_argument("csv_file", type=str, default=None, help="csv file")
   return parser
 
@@ -457,6 +505,7 @@ if __name__ == "__main__":
       "align_peptide": (align_peptide_main, align_peptide_add_argument),
       "align_complex": (align_complex_main, align_complex_add_argument),
       "csv_to_fasta": (csv_to_fasta_main, csv_to_fasta_add_argument),
+      "mhc_preprocess": (mhc_preprocess_main, mhc_preprocess_add_argument),
       "split_data": (split_data_main, split_data_add_argument),
   }
 
