@@ -137,6 +137,8 @@ def align_peptide_main(args):  # pylint: disable=redefined-outer-name
     seq_len[len(seq)].append(i)
 
   for fasta_file in args.files:
+    if args.verbose:
+      print(f"process {fasta_file} ...")
     with open(fasta_file, "r") as f:
       fasta_string = f.read()
     sequences, descriptions = parse_fasta(fasta_string)
@@ -351,21 +353,11 @@ def csv_to_fasta_main(args):  # pylint: disable=redefined-outer-name
     reader = csv.DictReader(f)
 
     for i, row in enumerate(reader, start=args.start_idx):
-      pep = row["Antigen"]
-      if cell_check(pep):
-        cell_write(pep, f"tcr_pmhc_{i}_P")
-
-      mhc = row["MHC_str"]
-      if cell_check(mhc):
-        cell_write(mhc, f"tcr_pmhc_{i}_M")
-
-      tcr_a = row["a_seq"]
-      if cell_check(tcr_a):
-        cell_write(tcr_a, f"tcr_pmhc_{i}_A")
-
-      tcr_b = row["b_seq"]
-      if cell_check(tcr_b):
-        cell_write(tcr_b, f"tcr_pmhc_{i}_B")
+      for key, chain in (("Antigen", "P"), ("MHC_str", "M"), ("a_seq", "A"),
+                         ("b_seq", "B")):
+        if key in row:
+          if cell_check(row[key]):
+            cell_write(row[key], f"{args.pid_prefix}{i}_{chain}")
 
   print("write mapping.idx ...")
   with open(os.path.join(args.output, "mapping.idx"), "w") as f:
@@ -384,6 +376,10 @@ def csv_to_fasta_add_argument(parser):  # pylint: disable=redefined-outer-name
                       type=int,
                       default=0,
                       help="start index for each protein.")
+  parser.add_argument("--pid_prefix",
+                      type=str,
+                      default="tcr_pmhc_",
+                      help="pid prefix.")
   parser.add_argument("csv_file", type=str, default=None, help="csv file")
   return parser
 
