@@ -5,6 +5,7 @@ from collections import defaultdict
 import csv
 from dataclasses import dataclass
 import functools
+import json
 import multiprocessing as mp
 import random
 from urllib.parse import urlparse, parse_qs
@@ -61,7 +62,7 @@ def parse_db_uri(db_uri):
     if "mapping_idx" in attrs:
       mapping_idx = attrs["mapping_idx"][0]
     if "attr_idx" in attrs:
-      chain_idx = attrs["attr_idx"][0]
+      attr_idx = attrs["attr_idx"][0]
   return DBUri(o.path, chain_idx, mapping_idx, attr_idx=attr_idx)
 
 
@@ -97,7 +98,7 @@ def read_attrs_idx(data_uri, attr_dict=None):
     with open(attr_idx_path, "r") as f:
       for line in filter(lambda x: x, map(lambda x: x.strip(), f)):
         k, *v = line.split()
-        attr_dict[k] = " ".join(v)
+        attr_dict[k] = json.loads(" ".join(v))
   return attr_dict
 
 
@@ -216,10 +217,13 @@ def align_complex(item, **kwargs):
     a3m_list.append(a3m_data)
 
   # db_mapping_idx = kwargs["db_mapping_idx"]
+  db_attr_idx = kwargs["db_attr_idx"]
   db_chain_idx = kwargs["db_chain_idx"]
 
   def _is_aligned(pid, chain_list):
-    return pid in db_chain_idx and len(db_chain_idx[pid]) == len(chain_list)
+    if pid in db_attr_idx:
+      return pid in db_chain_idx and len(db_chain_idx[pid]) == len(chain_list)
+    return False
 
   # filter complex with all chains aligned
   a3m_dict = {k: v for k, v in a3m_dict.items() if _is_aligned(k, v)}
@@ -245,7 +249,6 @@ def align_complex(item, **kwargs):
     return "*" * len(m.group(0))
 
   # hit chains
-  db_attr_idx = kwargs["db_attr_idx"]
   for pid, chain_list in a3m_dict.items():
     hit_desc = f">{pid} chains:{','.join(c for c, *_ in chain_list)}"
     if pid in db_attr_idx:
@@ -399,7 +402,7 @@ def create_negative_main(args):  # pylint: disable=redefined-outer-name
           row["Antigen"])
       peptides.add(row["Antigen"])
 
-  print("write {args.output} ...")
+  print(f"write {args.output} ...")
   with open(args.output, "w") as f:
     writer = csv.DictWriter(f, ("Antigen", "a_seq", "b_seq", "MHC_str"))
     writer.writeheader()
@@ -423,7 +426,7 @@ def create_negative_add_argument(parser):  # pylint: disable=redefined-outer-nam
   parser.add_argument("-o",
                       "--output",
                       type=str,
-                      default=".",
+                      default=None,
                       help="output dir.")
   parser.add_argument("-n",
                       "--amplify",
