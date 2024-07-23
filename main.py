@@ -5,6 +5,7 @@ from collections import defaultdict
 import csv
 from dataclasses import dataclass
 import functools
+import json
 import multiprocessing as mp
 import random
 from urllib.parse import urlparse, parse_qs
@@ -61,7 +62,7 @@ def parse_db_uri(db_uri):
     if "mapping_idx" in attrs:
       mapping_idx = attrs["mapping_idx"][0]
     if "attr_idx" in attrs:
-      chain_idx = attrs["attr_idx"][0]
+      attr_idx = attrs["attr_idx"][0]
   return DBUri(o.path, chain_idx, mapping_idx, attr_idx=attr_idx)
 
 
@@ -97,7 +98,7 @@ def read_attrs_idx(data_uri, attr_dict=None):
     with open(attr_idx_path, "r") as f:
       for line in filter(lambda x: x, map(lambda x: x.strip(), f)):
         k, *v = line.split()
-        attr_dict[k] = " ".join(v)
+        attr_dict[k] = json.loads(" ".join(v))
   return attr_dict
 
 
@@ -137,6 +138,8 @@ def align_peptide_main(args):  # pylint: disable=redefined-outer-name
     seq_len[len(seq)].append(i)
 
   for fasta_file in args.files:
+    if args.verbose:
+      print(f"process {fasta_file} ...")
     with open(fasta_file, "r") as f:
       fasta_string = f.read()
     sequences, descriptions = parse_fasta(fasta_string)
@@ -214,10 +217,13 @@ def align_complex(item, **kwargs):
     a3m_list.append(a3m_data)
 
   # db_mapping_idx = kwargs["db_mapping_idx"]
+  db_attr_idx = kwargs["db_attr_idx"]
   db_chain_idx = kwargs["db_chain_idx"]
 
   def _is_aligned(pid, chain_list):
-    return pid in db_chain_idx and len(db_chain_idx[pid]) == len(chain_list)
+    if pid in db_attr_idx:
+      return pid in db_chain_idx and len(db_chain_idx[pid]) == len(chain_list)
+    return False
 
   # filter complex with all chains aligned
   a3m_dict = {k: v for k, v in a3m_dict.items() if _is_aligned(k, v)}
@@ -243,7 +249,6 @@ def align_complex(item, **kwargs):
     return "*" * len(m.group(0))
 
   # hit chains
-  db_attr_idx = kwargs["db_attr_idx"]
   for pid, chain_list in a3m_dict.items():
     hit_desc = f">{pid} chains:{','.join(c for c, *_ in chain_list)}"
     if pid in db_attr_idx:
@@ -328,7 +333,7 @@ def csv_to_fasta_main(args):  # pylint: disable=redefined-outer-name
 
   print(f"load {args.target_uri} ...")
   target_uri = parse_db_uri(args.target_uri)
-  mapping_idx = read_mapping_idx(args.target_uri)
+  mapping_idx = read_mapping_idx(target_uri)
   fasta_idx = read_fasta(target_uri, mapping_idx)
 
   def cell_check(c):
@@ -351,21 +356,11 @@ def csv_to_fasta_main(args):  # pylint: disable=redefined-outer-name
     reader = csv.DictReader(f)
 
     for i, row in enumerate(reader, start=args.start_idx):
-      pep = row["Antigen"]
-      if cell_check(pep):
-        cell_write(pep, f"tcr_pmhc_{i}_P")
-
-      mhc = row["MHC_str"]
-      if cell_check(mhc):
-        cell_write(mhc, f"tcr_pmhc_{i}_M")
-
-      tcr_a = row["a_seq"]
-      if cell_check(tcr_a):
-        cell_write(tcr_a, f"tcr_pmhc_{i}_A")
-
-      tcr_b = row["b_seq"]
-      if cell_check(tcr_b):
-        cell_write(tcr_b, f"tcr_pmhc_{i}_B")
+      for key, chain in (("Antigen", "P"), ("MHC_str", "M"), ("a_seq", "A"),
+                         ("b_seq", "B")):
+        if key in row:
+          if cell_check(row[key]):
+            cell_write(row[key], f"{args.pid_prefix}{i}_{chain}")
 
   print("write mapping.idx ...")
   with open(os.path.join(args.output, "mapping.idx"), "w") as f:
@@ -384,6 +379,165 @@ def csv_to_fasta_add_argument(parser):  # pylint: disable=redefined-outer-name
                       type=int,
                       default=0,
                       help="start index for each protein.")
+  parser.add_argument("--pid_prefix",
+                      type=str,
+                      default="tcr_pmhc_",
+                      help="pid prefix.")
+  parser.add_argument("csv_file", type=str, default=None, help="csv file")
+  return parser
+
+
+def create_negative_main(args):  # pylint: disable=redefined-outer-name
+  random.seed()
+
+  mhc_seq_dict = {}
+
+  peptides = set()
+  tcr_mhc_rows = defaultdict(set)
+  print(f"process {args.csv_file} ...")
+  with open(args.csv_file, "r") as f:
+    reader = csv.DictReader(f)
+    for row in reader:
+      tcr_mhc_rows[(row["a_seq"], row["b_seq"], row["MHC_str"])].add(
+          row["Antigen"])
+      peptides.add(row["Antigen"])
+
+  print(f"write {args.output} ...")
+  with open(args.output, "w") as f:
+    writer = csv.DictWriter(f, ("Antigen", "a_seq", "b_seq", "MHC_str"))
+    writer.writeheader()
+    for i, (row, antigens) in enumerate(tcr_mhc_rows.items()):
+      a_seq, b_seq, mhc_str = row
+      if args.verbose:
+        print(f"{i}\t{len(antigens)}/{len(peptides)}")
+      negatives = list(peptides - antigens)
+      if negatives:
+        random.shuffle(negatives)
+        for antigen in negatives[:max(1, int(len(antigens) * args.amplify))]:
+          writer.writerow({
+              "Antigen": antigen,
+              "a_seq": a_seq,
+              "b_seq": b_seq,
+              "MHC_str": mhc_str
+          })
+
+
+def create_negative_add_argument(parser):  # pylint: disable=redefined-outer-name
+  parser.add_argument("-o",
+                      "--output",
+                      type=str,
+                      default=None,
+                      help="output dir.")
+  parser.add_argument("-n",
+                      "--amplify",
+                      type=float,
+                      default=1.0,
+                      help="amplify.")
+  parser.add_argument("csv_file", type=str, default=None, help="csv file")
+  return parser
+
+
+def mhc_filter_main(args):  # pylint: disable=redefined-outer-name
+  def _is_aligned(target, seq):
+    i, j = 0, 0
+    state = 0
+    while i < len(target) and j < len(seq):
+      if seq[j].islower():
+        return False
+      if state == 0:
+        if seq[j] == "-":
+          i, j = i + 1, j + 1
+        elif target[i] == seq[j]:
+          i, j = i + 1, j + 1
+          state = 1
+        else:
+          return False
+      elif state == 1:
+        if seq[j] == "-":
+          i, j = i + 1, j + 1
+          state = 2
+        elif target[i] == seq[j]:
+          i, j = i + 1, j + 1
+        else:
+          return False
+      elif state == 2:
+        if seq[j] != "-":
+          return False
+        i, j = i + 1, j + 1
+    # seq = seq.strip("i-")
+    # if re.match(".*[-a-z].*", seq):
+    #   return False
+    return True
+
+  for mhc_a3m_file in args.mhc_a3m_file:
+    print(f"processing {mhc_a3m_file} ...")
+    with open(mhc_a3m_file, "r") as f:
+      a3m_string = f.read()
+    sequences, descriptions = parse_fasta(a3m_string)
+    assert len(sequences) > 0
+    assert len(sequences) == len(descriptions)
+    print(f"{mhc_a3m_file}\t{len(sequences)}")
+    data = filter(lambda x: _is_aligned(sequences[0], x[0]),
+                  zip(sequences, descriptions))
+    sequences, descriptions = zip(*data)
+    print(f"{mhc_a3m_file}\t{len(sequences)}")
+
+
+def mhc_filter_add_argument(parser):  # pylint: disable=redefined-outer-name
+  parser.add_argument("mhc_a3m_file",
+                      type=str,
+                      nargs="+",
+                      help="mhc a3m files.")
+  return parser
+
+
+def mhc_preprocess_main(args):  # pylint: disable=redefined-outer-name
+  mhc_seq_dict = {}
+
+  print(f"load {args.mhc_seq_file} ...")
+  with open(args.mhc_seq_file, "r") as f:
+    reader = csv.DictReader(f)
+    for row in reader:
+      name = re.split(r"[*:]", row["name"])
+
+      for idx in (3, 2):
+        k = "".join(name[:idx])
+        if k not in mhc_seq_dict:
+          mhc_seq_dict[k] = row["sqe"]
+
+  mhc_rows = []
+  print(f"process {args.csv_file} ...")
+  with open(args.csv_file, "r") as f:
+    reader = csv.DictReader(f)
+
+    for row in reader:
+      allele = row["Allele"]
+      if allele in mhc_seq_dict:
+        mhc_rows.append({
+            "Antigen": row["Peptide"],
+            "MHC_str": mhc_seq_dict[allele]
+        })
+      elif args.verbose:
+        print(f"{allele} not found")
+
+  print("write {args.output} ...")
+  with open(args.output, "w") as f:
+    writer = csv.DictWriter(f, ("Antigen", "a_seq", "b_seq", "MHC_str"))
+    writer.writeheader()
+    for row in mhc_rows:
+      writer.writerow(row)
+
+
+def mhc_preprocess_add_argument(parser):  # pylint: disable=redefined-outer-name
+  parser.add_argument("-o",
+                      "--output",
+                      type=str,
+                      default=".",
+                      help="output dir.")
+  parser.add_argument("--mhc_seq_file",
+                      type=str,
+                      default=None,
+                      help="mhc sequence file.")
   parser.add_argument("csv_file", type=str, default=None, help="csv file")
   return parser
 
@@ -457,6 +611,9 @@ if __name__ == "__main__":
       "align_peptide": (align_peptide_main, align_peptide_add_argument),
       "align_complex": (align_complex_main, align_complex_add_argument),
       "csv_to_fasta": (csv_to_fasta_main, csv_to_fasta_add_argument),
+      "create_negatives": (create_negative_main, create_negative_add_argument),
+      "mhc_preprocess": (mhc_preprocess_main, mhc_preprocess_add_argument),
+      "mhc_a3m_filter": (mhc_filter_main, mhc_filter_add_argument),
       "split_data": (split_data_main, split_data_add_argument),
   }
 
