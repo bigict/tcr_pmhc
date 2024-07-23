@@ -437,6 +437,60 @@ def create_negative_add_argument(parser):  # pylint: disable=redefined-outer-nam
   return parser
 
 
+def mhc_filter_main(args):  # pylint: disable=redefined-outer-name
+  def _is_aligned(target, seq):
+    i, j = 0, 0
+    state = 0
+    while i < len(target) and j < len(seq):
+      if seq[j].islower():
+        return False
+      if state == 0:
+        if seq[j] == "-":
+          i, j = i + 1, j + 1
+        elif target[i] == seq[j]:
+          i, j = i + 1, j + 1
+          state = 1
+        else:
+          return False
+      elif state == 1:
+        if seq[j] == "-":
+          i, j = i + 1, j + 1
+          state = 2
+        elif target[i] == seq[j]:
+          i, j = i + 1, j + 1
+        else:
+          return False
+      elif state == 2:
+        if seq[j] != "-":
+          return False
+        i, j = i + 1, j + 1
+    # seq = seq.strip("i-")
+    # if re.match(".*[-a-z].*", seq):
+    #   return False
+    return True
+
+  for mhc_a3m_file in args.mhc_a3m_file:
+    print(f"processing {mhc_a3m_file} ...")
+    with open(mhc_a3m_file, "r") as f:
+      a3m_string = f.read()
+    sequences, descriptions = parse_fasta(a3m_string)
+    assert len(sequences) > 0
+    assert len(sequences) == len(descriptions)
+    print(f"{mhc_a3m_file}\t{len(sequences)}")
+    data = filter(lambda x: _is_aligned(sequences[0], x[0]),
+                  zip(sequences, descriptions))
+    sequences, descriptions = zip(*data)
+    print(f"{mhc_a3m_file}\t{len(sequences)}")
+
+
+def mhc_filter_add_argument(parser):  # pylint: disable=redefined-outer-name
+  parser.add_argument("mhc_a3m_file",
+                      type=str,
+                      nargs="+",
+                      help="mhc a3m files.")
+  return parser
+
+
 def mhc_preprocess_main(args):  # pylint: disable=redefined-outer-name
   mhc_seq_dict = {}
 
@@ -559,6 +613,7 @@ if __name__ == "__main__":
       "csv_to_fasta": (csv_to_fasta_main, csv_to_fasta_add_argument),
       "create_negatives": (create_negative_main, create_negative_add_argument),
       "mhc_preprocess": (mhc_preprocess_main, mhc_preprocess_add_argument),
+      "mhc_a3m_filter": (mhc_filter_main, mhc_filter_add_argument),
       "split_data": (split_data_main, split_data_add_argument),
   }
 
