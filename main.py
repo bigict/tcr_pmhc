@@ -7,41 +7,14 @@ from dataclasses import dataclass
 import functools
 import json
 import multiprocessing as mp
+import pickle
 import random
+import time
 from urllib.parse import urlparse, parse_qs
 
 from profold2.data.parsers import parse_fasta
-
-_seq_index_pattern = "(\\d+)-(\\d+)"
-
-
-def decompose_pid(pid, return_domain=False):
-  k = pid.find("/")
-  if k != -1:
-    pid, domains = pid[:k], pid[k + 1:]
-  else:
-    domains = None
-
-  k = pid.rfind("_")
-  if k != -1:
-    pid, chain = pid[:k], pid[k + 1:]
-  else:
-    chain = None
-
-  if return_domain:
-    return pid, chain, domains
-  return pid, chain
-
-
-def seq_index_split(text):
-  for s in text.split(","):
-    r = re.match(_seq_index_pattern, s)
-    assert r
-    yield tuple(map(int, r.group(1, 2)))
-
-
-def seq_index_join(seq_index):
-  return ",".join(f"{i}-{j}" for i, j in seq_index)
+from profold2.data.utils import decompose_pid, seq_index_join, seq_index_split
+from profold2.utils import timing
 
 
 @dataclass
@@ -50,26 +23,35 @@ class DBUri:
   chain_idx: str = "chain.idx"
   mapping_idx: str = "mapping.idx"
   attr_idx: str = "attr.idx"
+  a3m_dir: str = "a3m"
 
 
 def parse_db_uri(db_uri):
   o = urlparse(db_uri)
   chain_idx, mapping_idx, attr_idx = "chain.idx", "mapping.idx", "attr.idx"
+  a3m_dir = "a3m"
   if o.query:
     attrs = parse_qs(o.query)
     if "chain_idx" in attrs:
-      chain_idx = attrs["chain_idx"][0]
+      chain_idx = attrs["chain_idx"][-1]
     if "mapping_idx" in attrs:
-      mapping_idx = attrs["mapping_idx"][0]
+      mapping_idx = attrs["mapping_idx"][-1]
     if "attr_idx" in attrs:
-      attr_idx = attrs["attr_idx"][0]
-  return DBUri(o.path, chain_idx, mapping_idx, attr_idx=attr_idx)
+      attr_idx = attrs["attr_idx"][-1]
+    if "a3m_dir" in attrs:
+      a3m_dir = attrs["a3m_dir"][-1]
+  return DBUri(o.path, chain_idx, mapping_idx, attr_idx=attr_idx, a3m_dir=a3m_dir)
 
+def _db_uri_abs_path(data_uri, data_idx):
+  if os.path.isabs(data_idx):
+    return data_idx
+  return os.path.join(data_uri.path, data_idx)
 
 def read_mapping_idx(data_uri, mapping_dict=None):
   if mapping_dict is None:
     mapping_dict = {}
-  mapping_idx_path = os.path.join(data_uri.path, "mapping.idx")
+  # mapping_idx_path = os.path.join(data_uri.path, data_uri.mapping_idx)
+  mapping_idx_path = _db_uri_abs_path(data_uri, data_uri.mapping_idx)
   if os.path.exists(mapping_idx_path):
     with open(mapping_idx_path, "r") as f:
       for line in filter(lambda x: x, map(lambda x: x.strip(), f)):
@@ -81,7 +63,8 @@ def read_mapping_idx(data_uri, mapping_dict=None):
 def read_chain_idx(data_uri, chain_dict=None):
   if chain_dict is None:
     chain_dict = {}
-  chain_idx_path = os.path.join(data_uri.path, data_uri.chain_idx)
+  # chain_idx_path = os.path.join(data_uri.path, data_uri.chain_idx)
+  chain_idx_path = _db_uri_abs_path(data_uri, data_uri.chain_idx)
   if os.path.exists(chain_idx_path):
     with open(chain_idx_path, "r") as f:
       for line in filter(lambda x: x, map(lambda x: x.strip(), f)):
@@ -93,12 +76,15 @@ def read_chain_idx(data_uri, chain_dict=None):
 def read_attrs_idx(data_uri, attr_dict=None):
   if attr_dict is None:
     attr_dict = {}
-  attr_idx_path = os.path.join(data_uri.path, data_uri.attr_idx)
+  # attr_idx_path = os.path.join(data_uri.path, data_uri.attr_idx)
+  attr_idx_path = _db_uri_abs_path(data_uri, data_uri.attr_idx)
   if os.path.exists(attr_idx_path):
     with open(attr_idx_path, "r") as f:
       for line in filter(lambda x: x, map(lambda x: x.strip(), f)):
         k, *v = line.split()
-        attr_dict[k] = json.loads(" ".join(v))
+        try:
+          attr_dict[k] = json.loads(" ".join(v))
+        except: pass
   return attr_dict
 
 
@@ -177,7 +163,7 @@ def align_peptide_add_argument(parser):  # pylint: disable=redefined-outer-name
 
 def read_a3m(data_uri, mapping_idx, pdb_id):
   pdb_id = mapping_idx.get(pdb_id, pdb_id)
-  a3m_path = os.path.join(data_uri.path, "a3m", pdb_id, "msas", f"{pdb_id}.a3m")
+  a3m_path = os.path.join(_db_uri_abs_path(data_uri, data_uri.a3m_dir), pdb_id, "msas", f"{pdb_id}.a3m")
   with open(a3m_path, "r") as f:
     a3m_string = f.read()
   sequences, descriptions = parse_fasta(a3m_string)
@@ -186,16 +172,25 @@ def read_a3m(data_uri, mapping_idx, pdb_id):
 
 def align_a3m(a3m_data, mapping_dict, align_dict, **kwargs):
   a3m_seqs, a3m_descs = a3m_data
+
+  align_data_dict, align_chain_dict = align_dict
   for seq, desc in zip(a3m_seqs[1:], a3m_descs[1:]):
     pid, chain, domains = decompose_pid(desc.split()[0], return_domain=True)
-    domains = list(seq_index_split(domains))
+    if domains:
+      domains = list(seq_index_split(domains))
+    else:
+      domains = []
 
     pdb_id = f"{pid}_{chain}" if chain else pid
+    align_data_dict[pdb_id] = (domains, seq, desc, kwargs)
+
     pdb_id_list = set([pdb_id]) | set(mapping_dict.get(pdb_id, []))
     for pdb_id in pdb_id_list:
       pid, chain = decompose_pid(pdb_id)  # pylint: disable=unbalanced-tuple-unpacking
-      align_dict[pid].append((chain, domains, seq, desc, kwargs))
-  return align_dict
+      # align_dict[pid].append((chain, domains, seq, desc, kwargs))
+      align_chain_dict[pid].append(chain)
+  # return align_dict
+  return align_data_dict, align_chain_dict
 
 
 def align_complex(item, **kwargs):
@@ -206,27 +201,32 @@ def align_complex(item, **kwargs):
     return seqs[i], descs[i]
 
   # retrieve aligned chains
-  a3m_list, a3m_dict = [], defaultdict(list)
-  for chain in target_chain_list:
-    pid = f"{target_pid}_{chain}" if chain else target_pid
-    a3m_data = read_a3m(kwargs["target_uri"], kwargs["target_mapping_idx"], pid)
-    a3m_dict = align_a3m(a3m_data,
-                         kwargs["db_mapping_dict"],
-                         a3m_dict,
-                         target_chain=chain)
-    a3m_list.append(a3m_data)
+  a3m_list, a3m_dict = [], ({}, defaultdict(list))
+  with timing(f"read_a3m_dict ({target_pid})", print_fn=print):
+    for chain in target_chain_list:
+      pid = f"{target_pid}_{chain}" if chain else target_pid
+      a3m_data = read_a3m(kwargs["target_uri"], kwargs["target_mapping_idx"], pid)
+      with timing(f"align_a3m ({target_pid}_{chain})", print_fn=print):
+        a3m_dict = align_a3m(a3m_data,
+                             kwargs["db_mapping_dict"],
+                             a3m_dict,
+                             target_chain=chain)
+      a3m_list.append(a3m_data)
 
   # db_mapping_idx = kwargs["db_mapping_idx"]
   db_attr_idx = kwargs["db_attr_idx"]
   db_chain_idx = kwargs["db_chain_idx"]
+  db_mapping_idx = kwargs["db_mapping_idx"]
 
   def _is_aligned(pid, chain_list):
     if pid in db_attr_idx:
       return pid in db_chain_idx and len(db_chain_idx[pid]) == len(chain_list)
     return False
 
+  align_data_dict, a3m_dict = a3m_dict
   # filter complex with all chains aligned
-  a3m_dict = {k: v for k, v in a3m_dict.items() if _is_aligned(k, v)}
+  with timing(f"filter a3m_dict ({target_pid})", print_fn=print):
+    new_a3m_dict = {k: v for k, v in a3m_dict.items() if _is_aligned(k, v)}
 
   # realign the complex: iterate each target chain
   new_a3m_list = []
@@ -249,7 +249,7 @@ def align_complex(item, **kwargs):
     return "*" * len(m.group(0))
 
   # hit chains
-  for pid, chain_list in a3m_dict.items():
+  for pid, chain_list in new_a3m_dict.items():
     hit_desc = f">{pid} chains:{','.join(c for c, *_ in chain_list)}"
     if pid in db_attr_idx:
       hit_desc = f"{hit_desc} {db_attr_idx[pid]}"
@@ -259,7 +259,15 @@ def align_complex(item, **kwargs):
     for i, target_chain in enumerate(target_chain_list):
       seq, _ = _seq_at_i(a3m_list[i], 0)
       hit_seq_at_i = "*" * len(seq)
-      for _, _, hit_seq, _, attrs in chain_list:
+      # for _, _, hit_seq, _, attrs in chain_list:
+      for chain in chain_list:
+        pdb_id = f"{pid}_{chain}" if chain else pid
+        assert pdb_id in db_mapping_idx, (target_pid, pdb_id)
+        if pdb_id in align_data_dict:
+          _, hit_seq, _, attrs = align_data_dict[pdb_id]
+        else:
+          assert db_mapping_idx[pdb_id] in align_data_dict
+          _, hit_seq, _, attrs = align_data_dict[db_mapping_idx[pdb_id]]
         if attrs["target_chain"] == target_chain:
           hit_seq_at_i = hit_seq
           hit_seq_at_i = re.sub("^[-]+", _repl, hit_seq_at_i)
@@ -268,7 +276,7 @@ def align_complex(item, **kwargs):
       new_hit_seq += hit_seq_at_i
     new_a3m_list.append(new_hit_seq)
 
-  return item, new_a3m_list
+  return item, new_a3m_list, a3m_dict
 
 
 def align_complex_main(args):  # pylint: disable=redefined-outer-name
@@ -294,13 +302,14 @@ def align_complex_main(args):  # pylint: disable=redefined-outer-name
                           db_mapping_idx=db_mapping_idx,
                           db_attr_idx=db_attr_idx,
                           db_mapping_dict=db_mapping_dict)
-    for (pid, chain_list), a3m_list in p.imap(f,
-                                              target_chain_idx.items(),
-                                              chunksize=args.chunksize):
+    for (pid, chain_list), a3m_list, a3m_dict in p.imap(
+        f, target_chain_idx.items(), chunksize=args.chunksize):
       output_path = os.path.join(args.output, pid, "msas")
       os.makedirs(output_path, exist_ok=True)
       with open(os.path.join(output_path, f"{pid}.a3m"), "w") as f:
         f.write("\n".join(a3m_list))
+      with open(os.path.join(output_path, f"{pid}.pkl"), "wb") as f:
+        pickle.dump(a3m_dict, f)
       print(f"{pid}\t{len(a3m_list)/2}\t{chain_list}")
 
 
@@ -324,16 +333,18 @@ def align_complex_add_argument(parser):  # pylint: disable=redefined-outer-name
                       type=int,
                       default=None,
                       help="num of processes.")
-  parser.add_argument("--chunksize", type=int, default=1, help="chunksize.")
+  parser.add_argument("--chunksize", type=int, default=2, help="chunksize.")
   return parser
 
 
 def csv_to_fasta_main(args):  # pylint: disable=redefined-outer-name
-  os.makedirs(args.output, exist_ok=True)
+  output_uri = parse_db_uri(args.output)
+  os.makedirs(output_uri.path, exist_ok=True)
 
   print(f"load {args.target_uri} ...")
   target_uri = parse_db_uri(args.target_uri)
   mapping_idx = read_mapping_idx(target_uri)
+  attr_idx = read_attrs_idx(target_uri)
   fasta_idx = read_fasta(target_uri, mapping_idx)
 
   def cell_check(c):
@@ -341,7 +352,7 @@ def csv_to_fasta_main(args):  # pylint: disable=redefined-outer-name
 
   def cell_write(c, pid):
     if c not in fasta_idx:
-      fasta_path = os.path.join(args.output, "fasta")
+      fasta_path = os.path.join(output_uri.path, "fasta")
       os.makedirs(fasta_path, exist_ok=True)
       with open(os.path.join(fasta_path, f"{pid}.fasta"), "w") as f:
         f.write(f">{pid}\n")
@@ -356,15 +367,34 @@ def csv_to_fasta_main(args):  # pylint: disable=redefined-outer-name
     reader = csv.DictReader(f)
 
     for i, row in enumerate(reader, start=args.start_idx):
+      pdb_id = f"{args.pid_prefix}{i}"
+
       for key, chain in (("Antigen", "P"), ("MHC_str", "M"), ("a_seq", "A"),
-                         ("b_seq", "B")):
+                         ("b_seq", "B"), ("tcrb", "B")):
         if key in row:
           if cell_check(row[key]):
-            cell_write(row[key], f"{args.pid_prefix}{i}_{chain}")
+            cell_write(row[key], f"{pdb_id}_{chain}")
 
-  print("write mapping.idx ...")
-  with open(os.path.join(args.output, "mapping.idx"), "w") as f:
+      if "y" in row:
+        attr_idx[pdb_id] = {"label": float(row["y"])}
+      elif "label" in row:
+        attr_idx[pdb_id] = {"label": float(row["label"])}
+      elif args.default_y is not None:
+        attr_idx[pdb_id] = {"label": args.default_y}
+      if "HLA" in row:
+        if pdb_id in attr_idx:
+          attr_idx[pdb_id]["MHC"] = row["HLA"]
+        else:
+          attr_idx[pdb_id] = {"MHC": row["HLA"]}
+
+  print(f"write {output_uri.mapping_idx} ...")
+  with open(os.path.join(output_uri.path, output_uri.mapping_idx), "w") as f:
     for v, k in mapping_idx.items():
+      f.write(f"{k}\t{v}\n")
+  print(f"write {output_uri.attr_idx} ...")
+  with open(os.path.join(output_uri.path, output_uri.attr_idx), "w") as f:
+    for k, v in attr_idx.items():
+      v = json.dumps(v)
       f.write(f"{k}\t{v}\n")
 
 
@@ -383,6 +413,10 @@ def csv_to_fasta_add_argument(parser):  # pylint: disable=redefined-outer-name
                       type=str,
                       default="tcr_pmhc_",
                       help="pid prefix.")
+  parser.add_argument("--default_y",
+                      type=float,
+                      default=None,
+                      help="default label.")
   parser.add_argument("csv_file", type=str, default=None, help="csv file")
   return parser
 
@@ -604,6 +638,75 @@ def split_data_add_argument(parser):  # pylint: disable=redefined-outer-name
   return parser
 
 
+def tcr_pmhc_to_pmhc_main(args):  # pylint: disable=redefined-outer-name
+  output_uri = parse_db_uri(args.output)
+  os.makedirs(output_uri.path, exist_ok=True)
+
+  print(f"load {args.target_uri} ...")
+  target_uri = parse_db_uri(args.target_uri)
+
+  chain_idx = read_chain_idx(target_uri)
+  mapping_idx = read_mapping_idx(target_uri)
+  attr_idx = read_attrs_idx(target_uri)
+
+  new_mapping_dict = defaultdict(list)
+  for pid, chain_list in chain_idx.items():
+    if pid in attr_idx and attr_idx[pid]["label"] > 0:
+      if "P" in chain_list and "M" in chain_list:
+        new_mapping_dict[(mapping_idx[f"{pid}_P"], mapping_idx[f"{pid}_M"])].append(pid)
+
+  for (pid_p, pid_m), new_pid_list in new_mapping_dict.items():
+    print(f"new_pid_list_count: {pid_p} {pid_m} {len(new_pid_list)}")
+
+    m = len(new_pid_list)
+    if 0 < args.pid_topk < m:
+      m = args.pid_topk
+
+    for i, new_pid in enumerate(new_pid_list):
+      weight = m / len(new_pid_list)
+      attr_idx[new_pid].update(weight=weight)
+
+      if len(chain_idx[new_pid]) >= 3:
+        new_pid = f"{args.pid_prefix}{new_pid}"
+
+        mapping_idx[f"{new_pid}_P"] = pid_p
+        mapping_idx[f"{new_pid}_M"] = pid_m
+
+        attr_idx[new_pid] = {"label":1.0, "weight":weight}
+
+  print(f"write {output_uri.mapping_idx} ...")
+  with open(os.path.join(output_uri.path, output_uri.mapping_idx), "w") as f:
+    for v, k in mapping_idx.items():
+      f.write(f"{k}\t{v}\n")
+  print(f"write {output_uri.attr_idx} ...")
+  with open(os.path.join(output_uri.path, output_uri.attr_idx), "w") as f:
+    for k, v in attr_idx.items():
+      v = json.dumps(v)
+      f.write(f"{k}\t{v}\n")
+
+
+def tcr_pmhc_to_pmhc_add_argument(parser):  # pylint: disable=redefined-outer-name
+  parser.add_argument("-o",
+                      "--output",
+                      type=str,
+                      default=".",
+                      help="output dir.")
+  parser.add_argument("--target_uri", type=str, default=".", help="target dir.")
+  parser.add_argument("--start_idx",
+                      type=int,
+                      default=0,
+                      help="start index for each protein.")
+  parser.add_argument("--pid_prefix",
+                      type=str,
+                      default="pmhc_",
+                      help="pid prefix.")
+  parser.add_argument("--pid_topk",
+                      type=int,
+                      default=1,
+                      help="pid prefix.")
+  return parser
+
+
 if __name__ == "__main__":
   import argparse
 
@@ -615,6 +718,7 @@ if __name__ == "__main__":
       "mhc_preprocess": (mhc_preprocess_main, mhc_preprocess_add_argument),
       "mhc_a3m_filter": (mhc_filter_main, mhc_filter_add_argument),
       "split_data": (split_data_main, split_data_add_argument),
+      "tcr_pmhc_to_pmhc": (tcr_pmhc_to_pmhc_main, tcr_pmhc_to_pmhc_add_argument),
   }
 
   formatter_class = argparse.ArgumentDefaultsHelpFormatter

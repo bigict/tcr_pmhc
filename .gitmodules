@@ -1,0 +1,3 @@
+[submodule "profold2"]
+	path = profold2
+	url = git@github.com:bigict/ProFOLD2.git
