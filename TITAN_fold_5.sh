@@ -9,20 +9,21 @@ CWD=`dirname ${CWD}`
 export PYTHONPATH=${CWD}/profold2
 
 data_dir=${CWD}/data/TITAN_data
-output_dir=${data_dir}/output
+output_dir=${data_dir}/output2
 
 output_params="?attr_idx=attr.idx_all&mapping_idx=mapping.idx_all"
 
-#
-# python main.py csv_to_fasta -o "${output_dir}${output_params}" --target_uri "${output_dir}${output_params}" --pid_prefix pmhc_train_ --default_y=1.0 -v data/HLA_Data2_with_negs_and_label.csv
-#
 
-# convert csv to fasta files
+# convert csv to fasta files (pMHC data)
+python ${CWD}/main.py csv_to_fasta -o "${output_dir}${output_params}" --target_uri "${output_dir}${output_params}" --pid_prefix pmhc_train_ --default_y=1.0 -v ${CWD}/data/HLA_Data2_with_negs_and_label.csv
+
+
+# convert csv to fasta files (TCR_pMHC data)
 for ((i=0;i<5;++i)); do
   start_idx=$(expr ${i} \* 1000000)
   echo -e $i"\t"${start_idx}
-  python main.py csv_to_fasta -o "${output_dir}${output_params}" --target_uri "${output_dir}${output_params}" --pid_prefix tcr_pmhc_train_ --start_idx=${start_idx} -v ${data_dir}/train${i}
-  python main.py csv_to_fasta -o "${output_dir}${output_params}" --target_uri "${output_dir}${output_params}" --pid_prefix tcr_pmhc_test_ --start_idx=${start_idx} -v ${data_dir}/test${i}
+  python ${CWD}/main.py csv_to_fasta -o "${output_dir}${output_params}" --target_uri "${output_dir}${output_params}" --pid_prefix tcr_pmhc_train_ --start_idx=${start_idx} -v ${data_dir}/train${i}
+  python ${CWD}/main.py csv_to_fasta -o "${output_dir}${output_params}" --target_uri "${output_dir}${output_params}" --pid_prefix tcr_pmhc_test_ --start_idx=${start_idx} -v ${data_dir}/test${i}
 done
 
 # make chain.idx
@@ -117,7 +118,7 @@ for ((i=0;i<5;++i)); do
       }' > ${output_dir}/test_attr.idx_tcr_pmhc_${i}
 
   # augment tcr_pmhc data with pmhc and calculate weights
-  python main.py tcr_pmhc_to_pmhc \
+  python ${CWD}/main.py tcr_pmhc_to_pmhc \
       --target_uri "${output_dir}?mapping_idx=mapping.idx_all&chain_idx=chain.idx_tcr_pmhc_${i}&attr_idx=train_attr.idx_tcr_pmhc_${i}_all" \
       --output "${output_dir}?mapping_idx=mapping.idx_tcr_pmhc_${i}&attr_idx=train_attr.idx_tcr_pmhc_${i}" \
       --pid_topk=1000
@@ -160,7 +161,7 @@ for c in "A" "B" "M"; do
 done
 
 # align P with equal length
-python main.py align_peptide -o ${output_dir}/a3m --db ../db/tcr/tcr_pmhc_db_P.fa ${output_dir}/tcr_pmhc_P.fa -v ../custom_data/tcr_pmhc_db/fasta/*_P.fasta
+python ${CWD}/main.py align_peptide -o ${output_dir}/a3m --db ../db/tcr/tcr_pmhc_db_P.fa ${output_dir}/tcr_pmhc_P.fa -v ../custom_data/tcr_pmhc_db/fasta/*_P.fasta
 for c in "P"; do
   find ${CWD}/data/tcr_pmhc_db/fasta -name "*_${c}.fasta" > ${output_dir}/tcr_pmhc_db_${c}
   cat ${output_dir}/tcr_pmhc_db_${c} | ${CWD}/bin/mapred -m "PIPELINE_UNIREF_MAX_HITS=1000000 PIPELINE_MGNIFY_MAX_HITS=1000000 PYTHONPATH=${CWD}/profold2 sh ${CWD}/scripts/run_pipeline.sh -o ${output_dir}/a3m" -c 10
@@ -180,7 +181,7 @@ done
 # make sampling weights
 for ((i=0;i<5;++i)); do
   for t in "0.85" "0.90" "0.95"; do
-    python main.py align_complex \
+    python ${CWD}/main.py align_complex \
       -o ${output_dir}/complex_${i}_${t} \
       --db_uri "${output_dir}?mapping_idx=mapping.idx&attr_idx=train_attr.idx_tcr_pmhc_${i}" \
       --target_uri "${CWD}/data/tcr_pmhc_db?a3m_dir=${output_dir}/var${t}"
