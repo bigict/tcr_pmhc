@@ -6,6 +6,8 @@ set -e
 CWD=`readlink -f $0`
 CWD=`dirname ${CWD}`
 
+CWD=`dirname ${CWD}`
+
 export PYTHONPATH=${CWD}/profold2
 
 data_dir=${CWD}/data/tcr_pmhc_train_data_fold_5
@@ -20,8 +22,8 @@ python ${CWD}/main.py csv_to_fasta -o "${output_dir}${output_params}" --target_u
 
 # convert csv to fasta files (TCR_pMHC data)
 for ((i=0;i<5;++i)); do
-  start_idx=$(expr ${i} \* 1000000)
-  echo -e $i"\t"${start_idx}
+  start_idx=$((${i} * 1000000))
+  echo -e "$i\t${start_idx}"
   python ${CWD}/main.py csv_to_fasta -o "${output_dir}${output_params}" --target_uri "${output_dir}${output_params}" --pid_prefix tcr_pmhc_train_ --start_idx=${start_idx} -v ${data_dir}/train${i}
   python ${CWD}/main.py csv_to_fasta -o "${output_dir}${output_params}" --target_uri "${output_dir}${output_params}" --pid_prefix tcr_pmhc_test_ --start_idx=${start_idx} -v ${data_dir}/test${i}
 done
@@ -65,8 +67,8 @@ cat ${output_dir}/chain.idx_all | \
     }' > ${output_dir}/chain.idx_all_blacklist
 
 for ((i=0;i<5;++i)); do
-  start_idx=$(expr ${i} \* 1000000)
-  end_idx=$(expr ${i} \* 1000000 + 1000000)
+  start_idx=$((${i} * 1000000))
+  end_idx=$((${i} * 1000000 + 1000000))
 
   # make chain.idx for fold_i
   cat ${output_dir}/chain.idx_all | \
