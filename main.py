@@ -108,6 +108,15 @@ def read_fasta(data_uri, mapping_idx):
   return fasta_list
 
 
+def create_shared_obj(**kwargs):
+  context = mp.get_context()
+  manager = context.Manager()
+  shared_obj = manager.Namespace()
+  for k, v in kwargs.items():
+    setattr(shared_obj, k, v)
+  return shared_obj
+
+
 def align_peptide_main(args):  # pylint: disable=redefined-outer-name
   assert args.db
   seq_db, desc_db = [], []
@@ -193,8 +202,13 @@ def align_a3m(a3m_data, mapping_dict, align_dict, **kwargs):
   return align_data_dict, align_chain_dict
 
 
-def align_complex(item, **kwargs):
+def align_complex(shared_obj, target_uri, target_mapping_idx, item):
   target_pid, target_chain_list = item
+
+  db_attr_idx = shared_obj.db_attr_idx
+  db_chain_idx = shared_obj.db_chain_idx
+  db_mapping_idx = shared_obj.db_mapping_idx
+  db_mapping_dict = shared_obj.db_mapping_dict
 
   def _seq_at_i(a3m_data, i):
     seqs, descs = a3m_data
@@ -205,18 +219,13 @@ def align_complex(item, **kwargs):
   with timing(f"read_a3m_dict ({target_pid})", print_fn=print):
     for chain in target_chain_list:
       pid = f"{target_pid}_{chain}" if chain else target_pid
-      a3m_data = read_a3m(kwargs["target_uri"], kwargs["target_mapping_idx"], pid)
+      a3m_data = read_a3m(target_uri, target_mapping_idx, pid)
       with timing(f"align_a3m ({target_pid}_{chain})", print_fn=print):
         a3m_dict = align_a3m(a3m_data,
-                             kwargs["db_mapping_dict"],
+                             db_mapping_dict,
                              a3m_dict,
                              target_chain=chain)
       a3m_list.append(a3m_data)
-
-  # db_mapping_idx = kwargs["db_mapping_idx"]
-  db_attr_idx = kwargs["db_attr_idx"]
-  db_chain_idx = kwargs["db_chain_idx"]
-  db_mapping_idx = kwargs["db_mapping_idx"]
 
   def _is_aligned(pid, chain_list):
     if pid in db_attr_idx:
@@ -295,13 +304,14 @@ def align_complex_main(args):  # pylint: disable=redefined-outer-name
   target_chain_idx = read_chain_idx(target_uri)
 
   with mp.Pool(processes=args.processes) as p:
+    shared_obj = create_shared_obj(db_mapping_idx=db_mapping_idx,
+                                   db_chain_idx=db_chain_idx,
+                                   db_attr_idx=db_attr_idx,
+                                   db_mapping_dict=db_mapping_dict)
     f = functools.partial(align_complex,
-                          target_uri=target_uri,
-                          target_mapping_idx=target_mapping_idx,
-                          db_chain_idx=db_chain_idx,
-                          db_mapping_idx=db_mapping_idx,
-                          db_attr_idx=db_attr_idx,
-                          db_mapping_dict=db_mapping_dict)
+                          shared_obj,
+                          target_uri,
+                          target_mapping_idx)
     for (pid, chain_list), a3m_list, a3m_dict in p.imap(
         f, target_chain_idx.items(), chunksize=args.chunksize):
       output_path = os.path.join(args.output, pid, "msas")
@@ -370,7 +380,8 @@ def csv_to_fasta_main(args):  # pylint: disable=redefined-outer-name
       pdb_id = f"{args.pid_prefix}{i}"
 
       for key, chain in (("Antigen", "P"), ("MHC_str", "M"), ("a_seq", "A"),
-                         ("b_seq", "B"), ("tcrb", "B")):
+                         ("b_seq", "B"), ("tcrb", "B"), ("TCRA", "A"),
+                         ("TCRB", "B")):
         if key in row:
           if cell_check(row[key]):
             cell_write(row[key], f"{pdb_id}_{chain}")
