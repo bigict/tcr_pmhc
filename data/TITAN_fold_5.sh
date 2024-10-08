@@ -117,12 +117,12 @@ for ((i=0;i<5;++i)); do
             }
           }
         }
-      }' > ${output_dir}/test_attr.idx_tcr_pmhc_${i}
+      }' > ${output_dir}/test_attr.idx_tcr_pmhc_titan_fold${i}
 
   # augment tcr_pmhc data with pmhc and calculate weights
   python ${CWD}/main.py tcr_pmhc_to_pmhc \
       --target_uri "${output_dir}?mapping_idx=mapping.idx_all&chain_idx=chain.idx_tcr_pmhc_${i}&attr_idx=train_attr.idx_tcr_pmhc_${i}_all" \
-      --output "${output_dir}?mapping_idx=mapping.idx_tcr_pmhc_${i}&attr_idx=train_attr.idx_tcr_pmhc_${i}" \
+      --output "${output_dir}?mapping_idx=mapping.idx_tcr_pmhc_${i}&attr_idx=train_attr.idx_tcr_pmhc_titan_fold${i}" \
       --pid_topk=1000
 
   cat ${output_dir}/mapping.idx_tcr_pmhc_${i} | \
@@ -185,7 +185,7 @@ for ((i=0;i<5;++i)); do
   for t in "0.85" "0.90" "0.95"; do
     python ${CWD}/main.py align_complex \
       -o ${output_dir}/complex_${i}_${t} \
-      --db_uri "${output_dir}?mapping_idx=mapping.idx&attr_idx=train_attr.idx_tcr_pmhc_${i}" \
+      --db_uri "${output_dir}?mapping_idx=mapping.idx&attr_idx=train_attr.idx_tcr_pmhc_titan_fold${i}" \
       --target_uri "${CWD}/data/tcr_pmhc_db?a3m_dir=${output_dir}/var${t}"
     mkdir -p ${output_dir}/cache_${i}_${t}
     find ${output_dir}/complex_${i}_${t} -name "*.pkl" | awk -F "/" -v d=${output_dir}/cache_${i}_${t} '{
@@ -232,7 +232,7 @@ for ((i=0;i<5;++i)); do
           w = 10.0;
         }
         print w"\t"$0;
-      }' > ${output_dir}/model_weights_2022111102_tcr_pmhc_db_${i}_${t}
+      }' > ${output_dir}/model_weights_2022111102_tcr_pmhc_titan_fold${i}_${t}
 
   done
 done
