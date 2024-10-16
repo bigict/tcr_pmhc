@@ -104,7 +104,7 @@ def n_data(data, num=5):
     MHC_str_s = []
     for i, t in enumerate(CDR3b):
         for j, a in enumerate(Antigen):
-            if c[i] != Antigen_c[j] and random.randint(1, 100) % 40 == 0:
+            if c[i] != Antigen_c[j] and random.randint(1, 100) < 10:
                 CDR3b_s.append(CDR3b[i])
                 CDR3a_s.append(CDR3a[i])
 
@@ -113,12 +113,12 @@ def n_data(data, num=5):
                 Antigen_s.append(a)
                 HLA_s.append(HLA[j])
                 MHC_str_s.append(MHC_str[j])
-    n_data = pd.DataFrame(
+    n_data_ = pd.DataFrame(
         {"CDR3B": CDR3b_s, "CDR3A": CDR3a_s, "Antigen": Antigen_s, "HLA": HLA_s, "TCRA": a_seq_s, "TCRB": b_seq_s,
          "MHC_str": MHC_str_s})
-    n_data = n_data.drop_duplicates()
-    n_data = n_data.sample(data.shape[0] * num)
-    return n_data
+    n_data_ = n_data_.drop_duplicates()
+    n_data_ = n_data_.sample(data.shape[0] * num)
+    return n_data_
 
 
 # CDR3b,CDR3a,Antigen,HLA,a_seq,b_seq,MHC_str
