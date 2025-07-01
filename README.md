@@ -4,7 +4,7 @@
 
 [![Conventional Commits](https://img.shields.io/badge/Conventional%20Commits-1.0.0-yellow.svg)](https://conventionalcommits.org)
 
-This package provides an implementation of the inference pipeline of ProTCR. 
+This package provides an implementation of the inference pipeline of [ProTCR](https://gitbub.com/bigict/tcr_pmhc). 
 
 ## Installation
 

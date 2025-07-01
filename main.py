@@ -100,7 +100,7 @@ def read_attrs_idx(data_uri, attr_dict=None):
         k, *v = line.split()
         try:
           attr_dict[k] = json.loads(" ".join(v))
-        except:
+        except:  # pylint: disable=bare-except
           pass
   return attr_dict
 
@@ -207,7 +207,7 @@ _db_mapping_dict = defaultdict(list)
 
 
 def complex_align_init(*db_uri_list):
-  global _db_mapping_idx, _db_chain_idx, _db_attr_idx, _db_mapping_dict
+  global _db_mapping_idx, _db_chain_idx, _db_attr_idx
   for db_uri in db_uri_list:
     db_uri = parse_db_uri(db_uri)
     _db_mapping_idx = read_mapping_idx(db_uri, _db_mapping_idx)
@@ -218,7 +218,6 @@ def complex_align_init(*db_uri_list):
 
 
 def complex_align_func(output_dir, target_uri, target_mapping_idx, item):
-  global _db_mapping_idx, _db_chain_idx, _db_attr_idx, _db_mapping_dict
   target_pid, target_chain_list = item
 
   def _seq_at_i(a3m_data, i):
@@ -447,7 +446,7 @@ def sampling_weight(**args):  # pylint: disable=redefined-outer-name
     if 0 < args.pid_topk < m:
       m = args.pid_topk
 
-    for i, new_pid in enumerate(new_pid_list):
+    for _, new_pid in enumerate(new_pid_list):
       weight = m / len(new_pid_list)
       attr_idx[new_pid].update(weight=weight)
 
@@ -543,7 +542,7 @@ def a3m_read_name_list(**args):
   with mp.Pool() as p:
     for a3m_file, name_list in p.imap(_a3m_read_name_list, args.a3m_file, chunksize=4):
       for i, w, line in name_list:
-        print(f'{a3m_file}\t{i}\t{w}\t{line}')
+        print(f"{a3m_file}\t{i}\t{w}\t{line}")
 
 
 @main.command("fasta_extract")
