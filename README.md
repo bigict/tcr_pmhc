@@ -4,7 +4,7 @@
 
 [![Conventional Commits](https://img.shields.io/badge/Conventional%20Commits-1.0.0-yellow.svg)](https://conventionalcommits.org)
 
-This package provides an implementation of the inference pipeline of [ProTCR](https://gitbub.com/bigict/tcr_pmhc). 
+This package provides an implementation of the inference pipeline of [ProTCR](https://github.com/bigict/tcr_pmhc). 
 
 ## Installation
 
@@ -20,7 +20,7 @@ This package provides an implementation of the inference pipeline of [ProTCR](ht
   $conda acrivate tcr
   ```
 
-  You need to install the [ProFOLD2](https://gitbub.com/bigict/ProFOLD2) dependencies
+  You need to install the [ProFOLD2](https://github.com/bigict/ProFOLD2) dependencies
   ```bash
   bash profold2/install_env.sh
   ```
