@@ -213,7 +213,7 @@ for ((i=0;i<5;++i)); do
       --target_uri "${output_dir}?mapping_idx=mapping.idx&attr_idx=train_attr.idx_tcr_pmhc_db_fold${i}" \
       --query_uri "${CWD}/data/tcr_pmhc_db?a3m_dir=${output_dir}/var${t}"
 
-    find ${output_dir}/complex_${i}_${t} -name "*.a3m" | python ${CWD}/a3m_name_list.py > ${output_dir}/complex_${i}_${t}_a3m_name_list
+    find ${output_dir}/complex_${i}_${t} -name "*.a3m" -exec python ${CWD}/main.py a3m_read_name_list {} + > ${output_dir}/complex_${i}_${t}_a3m_name_list
     cat ${output_dir}/complex_${i}_${t}_a3m_name_list | awk '{
         n = split($1,x,"/");
         k = x[n];

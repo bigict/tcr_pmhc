@@ -14,6 +14,7 @@ import sqlitedict
 
 from profold2.data.parsers import parse_fasta, parse_a3m
 from profold2.data.utils import compose_pid, decompose_pid, seq_index_join, seq_index_split
+from profold2.tools import energy
 from profold2.utils import timing
 
 import task
@@ -206,6 +207,7 @@ _db_mapping_dict = defaultdict(list)
 
 
 def complex_align_init(*db_uri_list):
+  global _db_mapping_idx, _db_chain_idx, _db_attr_idx, _db_mapping_dict
   for db_uri in db_uri_list:
     db_uri = parse_db_uri(db_uri)
     _db_mapping_idx = read_mapping_idx(db_uri, _db_mapping_idx)
@@ -216,6 +218,7 @@ def complex_align_init(*db_uri_list):
 
 
 def complex_align_func(output_dir, target_uri, target_mapping_idx, item):
+  global _db_mapping_idx, _db_chain_idx, _db_attr_idx, _db_mapping_dict
   target_pid, target_chain_list = item
 
   def _seq_at_i(a3m_data, i):
@@ -257,7 +260,7 @@ def complex_align_func(output_dir, target_uri, target_mapping_idx, item):
     n += len(seq) + 100
   domains = seq_index_join(domains)
 
-  target_desc = f">{target_pid} domains:{domains}"
+  target_desc = f">{target_pid}\tdomains:{domains}"
   new_a3m_list.append(target_desc)
   new_a3m_list.append(target_seq)
 
@@ -266,9 +269,10 @@ def complex_align_func(output_dir, target_uri, target_mapping_idx, item):
 
   # hit chains
   for pid, chain_list in new_a3m_dict.items():
-    hit_desc = f">{pid} chains:{','.join(c for c, *_ in chain_list)}"
+    hit_desc = f">{pid}\tchains:{','.join(c for c, *_ in chain_list)}"
     if pid in _db_attr_idx:
-      hit_desc = f"{hit_desc} {_db_attr_idx[pid]}"
+      attr = json.dumps(_db_attr_idx[pid], separators=(",", ":"))
+      hit_desc = f"{hit_desc}\tattr:{attr}"
     new_a3m_list.append(hit_desc)
 
     new_hit_seq = ""
@@ -413,7 +417,7 @@ def csv_to_fasta(**args):
     print(f"write {target_uri.attr_idx} ...")
   with open(os.path.join(target_uri.path, target_uri.attr_idx), "w") as f:
     for k, v in attr_idx.items():
-      v = json.dumps(v)
+      v = json.dumps(v, separators=(",", ":"))
       f.write(f"{k}\t{v}\n")
 
 
@@ -450,7 +454,7 @@ def sampling_weight(**args):  # pylint: disable=redefined-outer-name
   print(f"write {target_uri.attr_idx} ...")
   with open(os.path.join(target_uri.path, target_uri.attr_idx), "w") as f:
     for k, v in attr_idx.items():
-      v = json.dumps(v)
+      v = json.dumps(v, separators=(",", ":"))
       f.write(f"{k}\t{v}\n")
 
 
@@ -512,6 +516,36 @@ def a3m_filter(**args):
       print(f"filtering {fasta_file} {n}/{len(sequences)}")
 
 
+def _a3m_read_name_list(a3m_file):
+  with open(a3m_file, "r") as f:
+    a3m_string = f.read()
+  _, descriptions = parse_fasta(a3m_string)
+
+  name_list = []
+  for i, desc in enumerate(descriptions):
+    w = 1.0
+    for field in desc.split("\t"):
+      k = field.find(":")
+      if k != -1 and field[:k] == "attr":
+        v = json.loads(field[k + 1:])
+        w = v.get("weight", w)
+        break
+    name_list.append((i, w, desc))
+  return a3m_file, name_list
+
+
+@main.command("a3m_read_name_list")
+@click.argument("a3m_file", type=click.Path(), nargs=-1)
+@click.option("-v", "--verbose", is_flag=True, help="verbose output.")
+def a3m_read_name_list(**args):
+  args = DictObject(**args)
+
+  with mp.Pool() as p:
+    for a3m_file, name_list in p.imap(_a3m_read_name_list, args.a3m_file, chunksize=4):
+      for i, w, line in name_list:
+        print(f'{a3m_file}\t{i}\t{w}\t{line}')
+
+
 @main.command("fasta_extract")
 @click.option("--target_uri", type=str, default=".", help="target dir.")
 @click.option("--chain", type=str, multiple=True, help="chain.")
@@ -547,8 +581,16 @@ def attr_update_weight_and_task(**args):
       v["weight"] = args.weight
       v["task_def"] = task_def
 
-      v = json.dumps(v)
+      v = json.dumps(v, separators=(",", ":"))
       print(f"{k}\t{v}")
+
+
+@main.command("predict")
+@click.option("-v", "--verbose", is_flag=True, help="verbose output.")
+def predict(**args):
+  args = DictObject(**args)
+
+  energy.main(args)
 
 
 if __name__ == "__main__":
