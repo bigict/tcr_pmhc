@@ -2,7 +2,10 @@
 
 # ProTCR
 
+![GitHub License](https://img.shields.io/github/license/bigict/tar_pmhc)
 [![Conventional Commits](https://img.shields.io/badge/Conventional%20Commits-1.0.0-yellow.svg)](https://conventionalcommits.org)
+![GitHub Release](https://img.shields.io/github/v/release/bigict/tcr_pmhc)
+
 
 This package provides an implementation of the inference pipeline of [ProTCR](https://github.com/bigict/tcr_pmhc). 
 
