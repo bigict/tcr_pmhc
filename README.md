@@ -12,12 +12,15 @@ This package provides an implementation of the inference pipeline of [ProTCR](ht
 ## Installation
 
 1.  Clone this repository and `cd` into it.
+
   ```bash
   $git clone https://github.com/bigict/tcr_pmhc.git
   $cd tcr_pmhc
   $git submodule update --init --remote
   ```
+
 2. Create conda an environment and activate it.
+
   ```bash
   $conda create -n tcr python=3.11
   $conda acrivate tcr
@@ -35,38 +38,24 @@ This package provides an implementation of the inference pipeline of [ProTCR](ht
 
 ## Running ProTCR
 
-1.  Inference
+1. Inference
+
   ```bash
-  $python main.py predict --models [MODEL_NAME1:]MODEL_FILE1 [MODEL_NAME2:]MODEL_FILE2
+  ./predict.sh --output_dir [OUTPUT_DIR] --model {fold0, fold1, fold2, fold3, fold4} [CSV_FILE]...
   ```
   
-  Just like `train`, you can run
+  You can run
   ```bash
-  $python main.py predict --help
+  $predict.sh --help
   ```
+  for further help.
   
-2.  Train a model
+2. Train
+
   Create the 5-fold dataset first
   ```bash
   bash data/train_data_fold_5.sh
   ```
 
-  ```bash
-  $./env/bin/python main.py train --prefix=OUTPUT_DIR
-  ```
-  
-  There are a lot of parameters, you can run
-    
-  ```bash
-  $./env/bin/python main.py train -h
-  ```
-  
-  for further help.
-  
-  `ProFOLD2` logs it's metrics to [TensorBoard](https://www.tensorflow.org/tensorboard). You can run
-  
-  ```bash
-  $tensorboard --logdir=OUTPUT_DIR
-  ```
-  
-  Then open http://localhost:6006 in you browser.
+  ProTCR was fine-tuned from [ProFOLD2](https://github.com/bigict/ProFOLD2) by Reinforcement Learning.
+  Please follow the instruction to train [ProFOLD2](https://github.com/bigict/ProFOLD2)

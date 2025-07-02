@@ -1,10 +1,12 @@
-"""Tools for preprocess TCR_pMHC data"""
+"""Tools for TCR_pMHC binding prediction"""
 import os
 import re
 from collections import defaultdict
 import csv
 from dataclasses import dataclass
 import functools
+import glob
+import io
 import json
 import multiprocessing as mp
 from urllib.parse import urlparse, parse_qs
@@ -12,6 +14,7 @@ from urllib.parse import urlparse, parse_qs
 import click
 import sqlitedict
 
+from profold2.data.dataset import ProteinStructureDataset
 from profold2.data.parsers import parse_fasta, parse_a3m
 from profold2.data.utils import compose_pid, decompose_pid, seq_index_join, seq_index_split
 from profold2.tools import energy
@@ -585,11 +588,76 @@ def attr_update_weight_and_task(**args):
 
 
 @main.command("predict")
+@click.option("-o", "--output_dir", type=str, default=".", help="output dir.")
+@click.option(
+    "-d", "--data_dir", type=click.Path(), default=".", help="TCR_pMHC data dir."
+)
+@click.option(
+    "--chunksize",
+    type=int,
+    default=None,
+    help="num of sequences to predict for each model"
+)
 @click.option("-v", "--verbose", is_flag=True, help="verbose output.")
+@click.option(
+    "--ref_dir",
+    type=click.Path(),
+    default=os.path.join(os.path.dirname(__file__), "data", "tcr_pmhc_db"),
+    hidden=True
+)
+@click.option("--ref_idx", type=str, default="test.idx", hidden=True)
+@click.option(
+    "--ref_pkl",
+    type=click.Path(),
+    default=os.path.join(os.path.dirname(__file__), "params"),
+    hidden=True
+)
+@click.option("-m", "--model", type=str, default="fold1")
+@click.option("--mask", type=str, default="-", hidden=True)
+@click.option("--task_def", type=str, default=json.dumps(task.make_def()), hidden=True)
 def predict(**args):
   args = DictObject(**args)
 
-  energy.main(args)
+  os.environ["profold2_data_var_dir"] = os.path.abspath(
+      os.path.join(args.data_dir, "var")
+  )
+  os.makedirs(args.output_dir, exist_ok=True)
+
+  data = ProteinStructureDataset(
+      data_dir=args.ref_dir,
+      data_idx=args.ref_idx,
+      mapping_idx=os.path.abspath(os.path.join(args.data_dir, "mapping.idx")),
+      chain_idx=os.path.abspath(os.path.join(args.data_dir, "chain.idx")),
+      attr_idx=os.path.abspath(os.path.join(args.data_dir, "attr.idx")),
+      pseudo_linker_prob=1.0,
+      pseudo_linker_shuffle=False,
+      var_task_num=task.task_num,
+      max_var_depth=None
+  )
+
+  for ref_pkl in glob.glob(os.path.join(args.ref_pkl, f"{args.model}_*.pkl")):
+    pdb_id = os.path.basename(ref_pkl)
+    assert pdb_id.startswith(f"{args.model}_")
+    pdb_id, _ = os.path.splitext(pdb_id[len(f"{args.model}_"):])
+    pid, chains = decompose_pid(pdb_id)
+    chains = chains.split(",")
+
+    if args.verbose:
+      print("predict affinity ranking score with {ref_pkl}")
+
+    setattr(args, "model_file", ref_pkl)
+    setattr(args, "model_ckpt", os.path.join(args.ref_pkl, f"{args.model}_model.pth"))
+
+    feat = data.get_multimer(compose_pid(pid, "P"), chains)
+    assert len(feat["str_var"]) == len(feat["variant_pid"])
+    a3m_string = "\n".join(
+        f">{pid}\n{var}" for pid, var in zip(feat["variant_pid"], feat["str_var"])
+    )
+    with io.StringIO(a3m_string) as a3m_file:
+      setattr(args, "a3m_file", [a3m_file])
+      with open(os.path.join(args.output_dir, f"{pid}.a3m"), "w") as output_file:
+        setattr(args, "output_file", output_file)
+        energy.main(args)
 
 
 if __name__ == "__main__":

@@ -32,7 +32,7 @@ cat ${HOME}/.bashrc
 echo ${PATH}
 
 USER_HOME=${HOME}
-CONDA_HOME=${HOME}/.local/anaconda3
+CONDA_HOME=${CONDA_HOME:-${HOME}/.local/anaconda3}
 
 . ${CONDA_HOME}/bin/activate ${CONDA_ENV} || exit 1
 
