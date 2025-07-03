@@ -4,6 +4,7 @@
 
 ![GitHub License](https://img.shields.io/github/license/bigict/tar_pmhc)
 [![Conventional Commits](https://img.shields.io/badge/Conventional%20Commits-1.0.0-yellow.svg)](https://conventionalcommits.org)
+![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/bigict/tcr_pmhc/pylint.yml)
 ![GitHub Release](https://img.shields.io/github/v/release/bigict/tcr_pmhc)
 
 
