@@ -46,8 +46,15 @@ This package provides an implementation of the inference pipeline of [ProTCR](ht
 
 1. Inference
 
+  Once you have installed ProTCR, you can test your setup using e.g. the following input `csv` file named `tcr_pmhc_input.csv`
+
+  ```csv
+  Antigen,TCRB,TCRA,MHC_str
+  ALSKGVHFV,VSQHPSWVICKSGTSVKIECRSLDFQATTMFWYRQFPKQSLMLMATSNEGSKATYEQGVEKDKFLINHASLTLSTLTVTSAHPEDSSFYICSARGSSGRAEYTQYFGPGTRLTVLE,,SHSMRYFFTSVSRPGRGEPRFIAVGYVDDTQFVRFDSDAASQRMEPRAPWIEQEGPEYWDGETRKVKAHSQTHRVDLGTLRGYYNQSEAGSHTVQRMYGCDVGSDWRFLRGYHQYAYDGKDYIALKEDLRSWTAADMAAQTTKHKWEAAHVAEQLRAYLEGTCVEWLRRYLENGKETLQRTD
+  ```
+
   ```bash
-  ./predict.sh --output_dir [OUTPUT_DIR] --model {fold0, fold1, fold2, fold3, fold4} [CSV_FILE]...
+  ./predict.sh --output_dir [OUTPUT_DIR] tcr_pmhc_input.csv
   ```
   
   You can run

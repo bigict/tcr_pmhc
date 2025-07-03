@@ -13,11 +13,9 @@ help() {
   exit $1
 }
 
-CONDA_ENV="pf2"
 OUTPUT_DIR="."
 while getopts 'x:o:h' OPT; do
   case $OPT in
-    x) CONDA_ENV="$OPTARG";;
     o) OUTPUT_DIR="$OPTARG";;
     h) help 0;;
     ?) help 1;;
@@ -31,12 +29,7 @@ cat ${HOME}/.bashrc
 
 echo ${PATH}
 
-USER_HOME=${HOME}
-CONDA_HOME=${CONDA_HOME:-${HOME}/.local/anaconda3}
-
-. ${CONDA_HOME}/bin/activate ${CONDA_ENV} || exit 1
-
-export PATH=${PATH}:${USER_HOME}/bin:${CONDA_HOME}/bin
+export PATH=${PATH}:${HOME}/bin
 
 uniref90_db=${uniref90_db:-db/uniref90/uniref90.fasta}
 mgnify_db=${mgnify_db:-db/mgnify/mgy_clusters.fa}

@@ -11,7 +11,6 @@ help() {
   exit $1
 }
 
-CONDA_ENV="pf2"
 OUTPUT_DIR="."
 while getopts 'x:o:h' OPT; do
   case $OPT in
@@ -29,12 +28,7 @@ cat ${HOME}/.bashrc
 
 echo ${PATH}
 
-USER_HOME=${HOME}
-CONDA_HOME=${CONDA_HOME:-${HOME}/.local/anaconda3}
-
-. ${CONDA_HOME}/bin/activate ${CONDA_ENV} || exit 1
-
-export PATH=${PATH}:${USER_HOME}/bin:${CONDA_HOME}/bin
+export PATH=${PATH}:${HOME}/bin
 
 for f in $(cat); do
   echo "msa_build: ${f}"
