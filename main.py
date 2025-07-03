@@ -651,7 +651,7 @@ def predict(**args):
       chains = chains.split(",")
 
       if args.verbose:
-        print("predict affinity ranking score with {model}:{ref_pkl}")
+        print(f"predict affinity ranking score with {model}:{ref_pkl}")
 
       setattr(args, "model_file", ref_pkl)
       setattr(args, "model_ckpt", os.path.join(args.ref_pkl, f"{model}_model.pth"))
