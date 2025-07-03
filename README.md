@@ -9,6 +9,12 @@
 
 This package provides an implementation of the inference pipeline of [ProTCR](https://github.com/bigict/tcr_pmhc). 
 
+## Requirements
+
+* [Python3.8+](https://www.python.org)
+* [ProFOLD2](https://github.com/bigict/ProFOLD2)
+* [Dependencies](https://github.com/bigict/tcr_pmhc/network/dependencies)
+
 ## Installation
 
 1.  Clone this repository and `cd` into it.
