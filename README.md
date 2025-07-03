@@ -20,16 +20,16 @@ This package provides an implementation of the inference pipeline of [ProTCR](ht
 1.  Clone this repository and `cd` into it.
 
   ```bash
-  $git clone https://github.com/bigict/tcr_pmhc.git
-  $cd tcr_pmhc
-  $git submodule update --init --remote
+  git clone https://github.com/bigict/tcr_pmhc.git
+  cd tcr_pmhc
+  git submodule update --init --remote
   ```
 
 2. Create conda an environment and activate it.
 
   ```bash
-  $conda create -n tcr python=3.11
-  $conda activate tcr
+  conda create -n tcr python=3.11
+  conda activate tcr
   ```
 
   You need to install the [ProFOLD2](https://github.com/bigict/ProFOLD2) dependencies
@@ -59,7 +59,7 @@ This package provides an implementation of the inference pipeline of [ProTCR](ht
   
   You can run
   ```bash
-  $predict.sh --help
+  predict.sh --help
   ```
   for further help.
   
