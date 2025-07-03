@@ -29,7 +29,7 @@ This package provides an implementation of the inference pipeline of [ProTCR](ht
 
   ```bash
   $conda create -n tcr python=3.11
-  $conda acrivate tcr
+  $conda activate tcr
   ```
 
   You need to install the [ProFOLD2](https://github.com/bigict/ProFOLD2) dependencies
