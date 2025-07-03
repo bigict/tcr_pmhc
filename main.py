@@ -593,13 +593,6 @@ def attr_update_weight_and_task(**args):
     "-d", "--data_dir", type=click.Path(), default=".", help="TCR_pMHC data dir."
 )
 @click.option(
-    "--chunksize",
-    type=int,
-    default=None,
-    help="num of sequences to predict for each model"
-)
-@click.option("-v", "--verbose", is_flag=True, help="verbose output.")
-@click.option(
     "--ref_dir",
     type=click.Path(),
     default=os.path.join(os.path.dirname(__file__), "data", "tcr_pmhc_db"),
@@ -612,9 +605,23 @@ def attr_update_weight_and_task(**args):
     default=os.path.join(os.path.dirname(__file__), "params"),
     hidden=True
 )
-@click.option("-m", "--model", type=str, default="fold1")
+@click.option(
+    "-m",
+    "--model",
+    type=click.Choice(["fold0", "fold1", "fold2", "fold3", "fold4"]),
+    default=["fold0", "fold1", "fold2", "fold3", "fold4"],
+    multiple=True,
+    help="select one or more models."
+)
 @click.option("--mask", type=str, default="-", hidden=True)
 @click.option("--task_def", type=str, default=json.dumps(task.make_def()), hidden=True)
+@click.option(
+    "--chunksize",
+    type=int,
+    default=None,
+    help="num of sequences to predict for each model"
+)
+@click.option("-v", "--verbose", is_flag=True, help="verbose output.")
 def predict(**args):
   args = DictObject(**args)
 
@@ -635,29 +642,32 @@ def predict(**args):
       max_var_depth=None
   )
 
-  for ref_pkl in glob.glob(os.path.join(args.ref_pkl, f"{args.model}_*.pkl")):
-    pdb_id = os.path.basename(ref_pkl)
-    assert pdb_id.startswith(f"{args.model}_")
-    pdb_id, _ = os.path.splitext(pdb_id[len(f"{args.model}_"):])
-    pid, chains = decompose_pid(pdb_id)
-    chains = chains.split(",")
+  for model in args.model:
+    for ref_pkl in glob.glob(os.path.join(args.ref_pkl, f"{model}_*.pkl")):
+      pdb_id = os.path.basename(ref_pkl)
+      assert pdb_id.startswith(f"{model}_")
+      pdb_id, _ = os.path.splitext(pdb_id[len(f"{model}_"):])
+      pid, chains = decompose_pid(pdb_id)
+      chains = chains.split(",")
 
-    if args.verbose:
-      print("predict affinity ranking score with {ref_pkl}")
+      if args.verbose:
+        print("predict affinity ranking score with {model}:{ref_pkl}")
 
-    setattr(args, "model_file", ref_pkl)
-    setattr(args, "model_ckpt", os.path.join(args.ref_pkl, f"{args.model}_model.pth"))
+      setattr(args, "model_file", ref_pkl)
+      setattr(args, "model_ckpt", os.path.join(args.ref_pkl, f"{model}_model.pth"))
 
-    feat = data.get_multimer(compose_pid(pid, "P"), chains)
-    assert len(feat["str_var"]) == len(feat["variant_pid"])
-    a3m_string = "\n".join(
-        f">{pid}\n{var}" for pid, var in zip(feat["variant_pid"], feat["str_var"])
-    )
-    with io.StringIO(a3m_string) as a3m_file:
-      setattr(args, "a3m_file", [a3m_file])
-      with open(os.path.join(args.output_dir, f"{pid}.a3m"), "w") as output_file:
-        setattr(args, "output_file", output_file)
-        energy.main(args)
+      feat = data.get_multimer(compose_pid(pid, "P"), chains)
+      assert len(feat["str_var"]) == len(feat["variant_pid"])
+      a3m_string = "\n".join(
+          f">{pid}\n{var}" for pid, var in zip(feat["variant_pid"], feat["str_var"])
+      )
+      with io.StringIO(a3m_string) as a3m_file:
+        setattr(args, "a3m_file", [a3m_file])
+        with open(
+            os.path.join(args.output_dir, f"{model}_{pid}.a3m"), "w"
+        ) as output_file:
+          setattr(args, "output_file", output_file)
+          energy.main(args)
 
 
 if __name__ == "__main__":

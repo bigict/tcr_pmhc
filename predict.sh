@@ -11,7 +11,7 @@ help() {
   echo "    -o OUTPUT_DIR, --output_dir OUTPUT_DIR"
   echo "               output dir. (default: .)"
   echo "    -m MODEL, --model MODEL {fold[0-4]}"
-  echo "               model. (default: fold0)"
+  echo "               model. (default: {fold[0-4]})"
   echo "    -t MHC_ALIGN_RATIO_THRESHOLD --mhc_align_ratio_threshold MHC_ALIGN_RATIO_THRESHOLD"
   echo "               filter MHC with threshold=t. (default: 0.85)"
   echo "    -h, --help show this help message and exit"
@@ -21,14 +21,14 @@ help() {
 output_dir="."
 output_params="?attr_idx=attr.idx_all&mapping_idx=mapping.idx_all"
 mhc_align_ratio_threshold=0.85
-model_prefix="fold0"
+model_args=""
 
-ARGS=$(getopt -o "o:h" -l "output_dir:,help" -- "$@") || help 1
+ARGS=$(getopt -o "o:m:h" -l "output_dir:,model:,help" -- "$@") || help 1
 eval "set -- ${ARGS}"
 while true; do
   case "$1" in
     (-o | --output_dir) output_dir="$2"; shift 2;;
-    (-m | --model) model_prefix="$2"; shift 2;;
+    (-m | --model) model_args="${model_args} --model $2"; shift 2;;
     (-t | --mhc_align_ratio_threshold) mhc_align_ratio_threshold="$2"; shift 2;;
     (-h | --help) help 0 ;;
     (--) shift 1; break;;
@@ -157,5 +157,6 @@ python ${CWD}/main.py a3m_filter \
 
 echo "predict ${csv_file}"
 python main.py predict \
+    ${model_args}
     --output_dir ${output_dir}/pred \
     --data_dir data/covid19_test
