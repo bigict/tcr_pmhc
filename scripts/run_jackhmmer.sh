@@ -23,12 +23,6 @@ while getopts 'x:o:h' OPT; do
 done
 shift $((OPTIND - 1))
 
-. ${HOME}/.bashrc
-
-cat ${HOME}/.bashrc
-
-echo ${PATH}
-
 export PATH=${PATH}:${HOME}/bin
 
 uniref90_db=${uniref90_db:-db/uniref90/uniref90.fasta}

@@ -126,8 +126,8 @@ done
 # align A B M with jackhmmer
 for c in "A" "B" "M"; do
   find ${CWD}/data/tcr_pmhc_db/fasta -name "*_${c}.fasta" > ${output_dir}/tcr_pmhc_db_${c}
-  cat ${output_dir}/tcr_pmhc_db_${c} | ${CWD}/bin/mapred -m "uniref90_db=${output_dir}/tcr_pmhc_${c}.fa mgnify_db=${CWD}/data/tcr_pmhc_db_${c}.fa PYTHONPATH=${CWD}/profold2 sh ${CWD}/scripts/run_jackhmmer.sh -o ${output_dir}/a3m" -c 10
-  cat ${output_dir}/tcr_pmhc_db_${c} | ${CWD}/bin/mapred -m "PIPELINE_UNIREF_MAX_HITS=1000000 PIPELINE_MGNIFY_MAX_HITS=1000000 PIPELINE_DEDUPLICATE=0 PYTHONPATH=${CWD}/profold2 sh ${CWD}/scripts/run_pipeline.sh -o ${output_dir}/a3m" -c 10
+  cat ${output_dir}/tcr_pmhc_db_${c} | ${CWD}/bin/mapred -m "uniref90_db=${output_dir}/tcr_pmhc_${c}.fa mgnify_db=${CWD}/data/tcr_pmhc_db_${c}.fa sh ${CWD}/scripts/run_jackhmmer.sh -o ${output_dir}/a3m" -c 10
+  cat ${output_dir}/tcr_pmhc_db_${c} | ${CWD}/bin/mapred -m "PIPELINE_UNIREF_MAX_HITS=1000000 PIPELINE_MGNIFY_MAX_HITS=1000000 PIPELINE_DEDUPLICATE=0 sh ${CWD}/scripts/run_pipeline.sh -o ${output_dir}/a3m" -c 10
 done
 
 # align P with equal length
@@ -139,7 +139,7 @@ python ${CWD}/main.py peptide_align \
 
 for c in "P"; do
   find ${CWD}/data/tcr_pmhc_db/fasta -name "*_${c}.fasta" > ${output_dir}/tcr_pmhc_db_${c}
-  cat ${output_dir}/tcr_pmhc_db_${c} | ${CWD}/bin/mapred -m "PIPELINE_UNIREF_MAX_HITS=1000000 PIPELINE_MGNIFY_MAX_HITS=1000000 PIPELINE_DEDUPLICATE=0 PYTHONPATH=${CWD}/profold2 sh ${CWD}/scripts/run_pipeline.sh -o ${output_dir}/a3m" -c 10
+  cat ${output_dir}/tcr_pmhc_db_${c} | ${CWD}/bin/mapred -m "PIPELINE_UNIREF_MAX_HITS=1000000 PIPELINE_MGNIFY_MAX_HITS=1000000 PIPELINE_DEDUPLICATE=0 sh ${CWD}/scripts/run_pipeline.sh -o ${output_dir}/a3m" -c 10
 done
 
 # filter a3m with threshold=t
@@ -157,6 +157,6 @@ python ${CWD}/main.py a3m_filter \
 
 echo "predict ${csv_file}"
 python main.py predict \
-    ${model_args}
+    ${model_args} \
     --output_dir ${output_dir}/pred \
     --data_dir data/covid19_test
