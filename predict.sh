@@ -159,4 +159,4 @@ echo "predict ${csv_file}"
 python main.py predict \
     ${model_args} \
     --output_dir ${output_dir}/pred \
-    --data_dir data/covid19_test
+    --data_dir ${output_dir}
