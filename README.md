@@ -45,7 +45,16 @@ This package provides an implementation of the inference pipeline of [ProTCR](ht
 
 ## Running ProTCR
 
-1. Inference
+1. Model Parameters
+
+   The [ProTCR](https://github.com/bigict/tcr_pmhc) model parameters are hosted on [Hugging Face](https://huggingface.co/bigict/tcr_pmhc).
+
+   ```bash
+   huggingface-cli download --local-dir params bigict/tcr_pmhc
+   
+   ```
+
+2. Inference
 
   Once you have installed ProTCR, you can test your setup using e.g. the following input `csv` file named `tcr_pmhc_input.csv`
 
@@ -63,13 +72,8 @@ This package provides an implementation of the inference pipeline of [ProTCR](ht
   predict.sh --help
   ```
   for further help.
-  
-2. Train
 
-  Create the 5-fold dataset first
-  ```bash
-  bash data/train_data_fold_5.sh
-  ```
+## Known Issues
 
-  ProTCR was fine-tuned from [ProFOLD2](https://github.com/bigict/ProFOLD2) by Reinforcement Learning.
-  Please follow the instruction to train [ProFOLD2](https://github.com/bigict/ProFOLD2)
+  Please [create an issue](https://github.com/bigict/tcr_pmhc/issues/new) if it is not already listed in the [issues tracker](https://github.com/bigict/tcr_pmhc/issues)
+
