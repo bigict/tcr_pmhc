@@ -1,3 +1,4 @@
 click
 sqlitedict
 hmmer
+huggingface_hub
