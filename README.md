@@ -69,7 +69,7 @@ This package provides an implementation of the inference pipeline of [ProTCR](ht
   
   You can run
   ```bash
-  predict.sh --help
+  ./predict.sh --help
   ```
   for further help.
 
