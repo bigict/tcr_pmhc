@@ -134,6 +134,7 @@ done
 python ${CWD}/main.py peptide_align \
   --output_dir ${output_dir}/a3m \
   --target_db ${output_dir}/tcr_pmhc_P.fa \
+  --target_db ${CWD}/data/tcr_pmhc_db_P.fa \
   --verbose \
   ${CWD}/data/tcr_pmhc_db/fasta/*_P.fasta \
 
