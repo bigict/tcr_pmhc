@@ -9,6 +9,7 @@ task_mapping = {
 
 task_num = len(task_mapping.keys())
 
+task_name_list = ["pMHC", "pTCR", "TCR_pMHC"]
 
 def make_def():
   task_def = defaultdict(list)
