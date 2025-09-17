@@ -2,17 +2,17 @@
 
 # ProTCR
 
-![GitHub License](https://img.shields.io/github/license/bigict/tar_pmhc)
+![GitHub License](https://img.shields.io/github/license/bigict/ProTCR)
 [![Conventional Commits](https://img.shields.io/badge/Conventional%20Commits-1.0.0-yellow.svg)](https://conventionalcommits.org)
-![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/bigict/tcr_pmhc/pylint.yml)
-![GitHub Release](https://img.shields.io/github/v/release/bigict/tcr_pmhc)
+![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/bigict/ProTCR/pylint.yml)
+![GitHub Release](https://img.shields.io/github/v/release/bigict/ProTCR)
 
 
-This package provides an implementation of the inference pipeline of [ProTCR](https://github.com/bigict/tcr_pmhc). 
+This package provides an implementation of the inference pipeline of [ProTCR](https://github.com/bigict/ProTCR). 
 
 ## Requirements
 
-* [Python3.8+](https://www.python.org)
+* [Python3.9+](https://www.python.org)
 * [ProFOLD2](https://github.com/bigict/ProFOLD2)
 * [Dependencies](https://github.com/bigict/tcr_pmhc/network/dependencies)
 
@@ -21,8 +21,8 @@ This package provides an implementation of the inference pipeline of [ProTCR](ht
 1.  Clone this repository and `cd` into it.
 
   ```bash
-  git clone https://github.com/bigict/tcr_pmhc.git
-  cd tcr_pmhc
+  git clone https://github.com/bigict/ProTCR.git
+  cd ProTCR
   git submodule update --init --remote
   ```
 
@@ -47,10 +47,10 @@ This package provides an implementation of the inference pipeline of [ProTCR](ht
 
 1. Model Parameters
 
-   The [ProTCR](https://github.com/bigict/tcr_pmhc) model parameters are hosted on [Hugging Face](https://huggingface.co/bigict/tcr_pmhc).
+   The [ProTCR](https://github.com/bigict/ProTCR) model parameters are hosted on [Hugging Face](https://huggingface.co/bigict/ProTCR).
 
    ```bash
-   huggingface-cli download --local-dir params bigict/tcr_pmhc
+   huggingface-cli download --local-dir params bigict/ProTCR
    
    ```
 
@@ -75,5 +75,5 @@ This package provides an implementation of the inference pipeline of [ProTCR](ht
 
 ## Known Issues
 
-  Please [create an issue](https://github.com/bigict/tcr_pmhc/issues/new) if it is not already listed in the [issues tracker](https://github.com/bigict/tcr_pmhc/issues)
+  Please [create an issue](https://github.com/bigict/ProTCR/issues/new) if it is not already listed in the [issues tracker](https://github.com/bigict/ProTCR/issues)
 

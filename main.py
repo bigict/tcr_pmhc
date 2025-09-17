@@ -471,6 +471,18 @@ def sampling_weight(**args):  # pylint: disable=redefined-outer-name
     default=0.5,
     help="aligned ratio threshold."
 )
+@click.option(
+    "--min_sequence_identity",
+    type=float,
+    default=0.0,
+    help="maximum sequence identity."
+)
+@click.option(
+    "--max_sequence_identity",
+    type=float,
+    default=1.0,
+    help="maximum sequence identity."
+)
 @click.option("--trim_gap", is_flag=True, help="trim gap.")
 @click.option("-v", "--verbose", is_flag=True, help="verbose output.")
 def a3m_filter(**args):
@@ -509,9 +521,15 @@ def a3m_filter(**args):
     with open(a3m_file, "w") as f:
       n = 0
       for i, seq in enumerate(aligned_seqs):
-        msa_aligned_ratio = _aligned_ratio(
+        # FIXME: this is sequence_identity in fact. ^_~
+        msa_seq_ident = _aligned_ratio(
             seq, query=sequences[0], trim_gap=args.trim_gap
         )
+        if i != 0 and not (
+            args.min_sequence_identity <= msa_seq_ident <= args.max_sequence_identity
+        ):
+          continue
+        msa_aligned_ratio = _aligned_ratio(seq, trim_gap=args.trim_gap)
         if msa_aligned_ratio >= args.aligned_ratio_threshold:
           f.write(f">{descriptions[i]} aligned_ratio:{msa_aligned_ratio}\n")
           f.write(f"{sequences[i]}\n")
@@ -552,6 +570,7 @@ def a3m_read_name_list(**args):
 @main.command("fasta_extract")
 @click.option("--target_uri", type=str, default=".", help="target dir.")
 @click.option("--chain", type=str, multiple=True, help="chain.")
+@click.option("-o", "--output", is_flag=True, help="output to fasta dir.")
 @click.option("-v", "--verbose", is_flag=True, help="verbose output.")
 def fasta_extract(**args):
   args = DictObject(**args)
@@ -560,11 +579,18 @@ def fasta_extract(**args):
   with sqlitedict.open(
       os.path.join(target_uri.path, "fasta.db"), autocommit=False
   ) as fasta_db:
+    if args.output:
+      os.makedirs(os.path.join(target_uri.path, "fasta"), exist_ok=True)
     for pid, seq in fasta_db.items():
       k = pid.rfind("_")
       assert k != -1
       chain = pid[k + 1:]
       if chain in args.chain:
+        if args.output:
+          with open(
+              os.path.join(target_uri.path, "fasta", f"{pid}.fasta"), "w"
+          ) as f:
+            f.write(f">{pid}\n{seq}\n")
         print(f">{pid}\n{seq}")
 
 
